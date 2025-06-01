@@ -25,19 +25,13 @@ class Song extends Model
      */
     protected $fillable = [
         'title',
-        'artist_id',
+        'artist',
         'album_id',
         'duration',
         'genre_id',
+        'cover_image',
+        'release_date',
     ];
-
-    /**
-     * Get the artist that owns the song
-     */
-    public function artist(): BelongsTo
-    {
-        return $this->belongsTo(Artist::class, 'artist_id');
-    }
 
     /**
      * Get the album that contains the song
@@ -60,7 +54,7 @@ class Song extends Model
      */
     public function playlists(): BelongsToMany
     {
-        return $this->belongsToMany(Playlist::class, 'playlist_cancion', 'song_id', 'playlist_id')
+        return $this->belongsToMany(Playlist::class, 'playlist_cancion', 'cancion_id', 'playlist_id')
                     ->withPivot('order')
                     ->withTimestamps();
     }

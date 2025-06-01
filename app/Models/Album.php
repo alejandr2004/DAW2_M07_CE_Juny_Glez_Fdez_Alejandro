@@ -18,9 +18,9 @@ class Album extends Model
      */
     protected $fillable = [
         'title',
-        'artist_id',
+        'artist',
+        'release_year',
         'cover_image',
-        'release_year'
     ];
 
     /**
@@ -32,13 +32,7 @@ class Album extends Model
         'release_year' => 'integer'
     ];
 
-    /**
-     * Get the artist that owns the album
-     */
-    public function artist(): BelongsTo
-    {
-        return $this->belongsTo(Artist::class);
-    }
+    // El artista ahora es un campo string, no una relación
 
     /**
      * Get songs in this album

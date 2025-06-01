@@ -7,7 +7,7 @@
     <div class="p-6">
         <h1 class="text-3xl font-bold mb-6">Crear nueva playlist</h1>
         
-        <form action="#" method="POST">
+        <form action="{{ route('playlists.store') }}" method="POST">
             @csrf
             <div class="mb-4">
                 <label for="name" class="block text-gray-700 text-sm font-bold mb-2">Nombre de la playlist</label>

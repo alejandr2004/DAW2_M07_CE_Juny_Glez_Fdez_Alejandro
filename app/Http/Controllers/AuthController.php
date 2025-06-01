@@ -49,7 +49,8 @@ class AuthController extends Controller
                 return redirect()->intended(route('admin.dashboard'));
             }
 
-            return redirect()->intended(route('home'));
+            // Redireccionar a usuarios clientes al catálogo de canciones
+            return redirect()->intended(route('songs.index'));
         }
 
         throw ValidationException::withMessages([

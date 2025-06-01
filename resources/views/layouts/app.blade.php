@@ -25,23 +25,41 @@
     </style>
 </head>
 <body class="bg-gray-100 flex flex-col min-h-screen">
+    @if(!in_array(request()->route()->getName(), ['login', 'register']))
     <header class="bg-black text-white shadow-md">
         <div class="container mx-auto px-4 py-4 flex justify-between items-center">
-            <a href="{{ route('home') }}" class="text-2xl font-bold flex items-center">
-                <span class="text-spotify mr-2">MySpotify</span>
-            </a>
+            <div class="flex items-center">
+                <a href="{{ route('home') }}" class="text-2xl font-bold flex items-center">
+                    <span class="text-spotify mr-2">MySpotify</span>
+                </a>
+                
+                @auth
+                <!-- Nombre de usuario destacado siempre visible para usuarios autenticados -->
+                <div class="ml-6 px-3 py-1 bg-spotify rounded-full flex items-center">
+                    <div class="w-5 h-5 mr-2 flex items-center justify-center bg-white rounded-full">
+                        <span class="text-spotify text-xs font-bold">{{ substr(auth()->user()->name, 0, 1) }}</span>
+                    </div>
+                    <span class="text-white font-bold">{{ auth()->user()->name }}</span>
+                </div>
+                @endauth
+            </div>
             
             <nav>
-                <ul class="flex space-x-6">
+                <ul class="flex space-x-6 items-center">
+                    <li><a href="{{ route('songs.index') }}" class="hover:text-spotify">Catálogo</a></li>
+                    <li><a href="{{ route('artists.index') }}" class="hover:text-spotify">Artistas</a></li>
+                    
                     @guest
                         <li><a href="{{ route('login') }}" class="hover:text-spotify">Iniciar sesión</a></li>
                         <li><a href="{{ route('register') }}" class="hover:text-spotify">Registrarse</a></li>
                     @else
+                        <li><a href="{{ route('playlists.index') }}" class="hover:text-spotify">Mis playlists</a></li>
+                        
                         @if(auth()->user()->role === 'admin')
                             <li><a href="{{ route('admin.dashboard') }}" class="hover:text-spotify">Panel de administración</a></li>
                         @endif
-                        <li><a href="{{ route('playlists.index') }}" class="hover:text-spotify">Mis playlists</a></li>
-                        <li>
+                        
+                        <li class="ml-4">
                             <form action="{{ route('logout') }}" method="POST" class="inline">
                                 @csrf
                                 <button type="submit" class="hover:text-spotify">Cerrar sesión</button>
@@ -52,6 +70,7 @@
             </nav>
         </div>
     </header>
+    @endif
 
     <main class="container mx-auto px-4 py-8 flex-grow">
         @if(session('success'))

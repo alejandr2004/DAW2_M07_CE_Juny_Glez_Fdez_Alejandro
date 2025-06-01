@@ -13,7 +13,10 @@ return new class extends Migration
     {
         Schema::create('artistas', function (Blueprint $table) {
             $table->id();
-            $table->string('name', 100)->unique();
+            $table->string('nombre', 100)->unique();
+            $table->text('biografia')->nullable();
+            $table->string('imagen')->nullable();
+            $table->string('pais', 100)->nullable();
             $table->timestamps();
         });
     }

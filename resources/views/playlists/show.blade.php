@@ -22,7 +22,12 @@
         </div>
         
         <div class="mb-6">
-            <h2 class="text-xl font-semibold mb-4">Canciones</h2>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">Canciones</h2>
+                @if($playlist->user_id === auth()->id())
+                    <a href="{{ route('playlists.add-songs', $playlist) }}" class="btn-spotify py-1 px-3 rounded text-sm">Añadir canciones</a>
+                @endif
+            </div>
             
             @if(isset($playlist) && $playlist->songs->count() > 0)
                 <div class="overflow-x-auto">
@@ -43,10 +48,16 @@
                                 <td class="py-2 px-4">{{ $index + 1 }}</td>
                                 <td class="py-2 px-4">{{ $song->title }}</td>
                                 <td class="py-2 px-4">{{ $song->artist->name }}</td>
-                                <td class="py-2 px-4">{{ $song->album->name }}</td>
+                                <td class="py-2 px-4">{{ $song->album->title }}</td>
                                 <td class="py-2 px-4">{{ $song->duration }}</td>
                                 <td class="py-2 px-4">
-                                    <button class="text-red-500 hover:text-red-700">Eliminar</button>
+                                    @if($playlist->user_id === auth()->id())
+                                        <form action="{{ route('playlists.remove-song', [$playlist, $song]) }}" method="POST" class="inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="text-red-500 hover:text-red-700">Eliminar</button>
+                                        </form>
+                                    @endif
                                 </td>
                             </tr>
                             @endforeach
@@ -56,7 +67,9 @@
             @else
                 <div class="bg-gray-100 p-6 rounded-lg text-center">
                     <p class="text-gray-600 mb-4">No hay canciones en esta playlist.</p>
-                    <a href="#" class="btn-spotify py-2 px-4 rounded inline-block">Añadir canciones</a>
+                    @if($playlist->user_id === auth()->id())
+                        <a href="{{ route('playlists.add-songs', $playlist) }}" class="btn-spotify py-2 px-4 rounded inline-block">Añadir canciones</a>
+                    @endif
                 </div>
             @endif
         </div>

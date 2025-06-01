@@ -20,6 +20,8 @@ class DatabaseSeeder extends Seeder
             AlbumSeeder::class,
             SongSeeder::class,
             PlaylistSeeder::class,
+            // Añadimos el nuevo seeder para asociar canciones a artistas sin canciones
+            SongArtistSeeder::class,
         ]);
     }
 }

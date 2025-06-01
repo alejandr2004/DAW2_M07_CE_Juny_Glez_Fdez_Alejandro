@@ -34,8 +34,11 @@ class ArtistSeeder extends Seeder
 
         // Insertar cada artista en la base de datos
         foreach ($artists as $artistName) {
+            $paises = ['España', 'Estados Unidos', 'Reino Unido', 'Canada', 'Puerto Rico'];
             Artist::create([
-                'name' => $artistName
+                'nombre' => $artistName,
+                'biografia' => 'Biografía de ' . $artistName,
+                'pais' => $paises[array_rand($paises)]
             ]);
         }
     }
