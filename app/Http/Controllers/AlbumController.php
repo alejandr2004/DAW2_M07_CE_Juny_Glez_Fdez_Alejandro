@@ -94,43 +94,99 @@ class AlbumController extends Controller
             abort(403, 'No tienes permiso para crear álbumes.');
         }
         
-        $request->validate([
+        $validator = validator($request->all(), [
             'title' => 'required|string|max:255',
             'artist_id' => 'required|exists:artistas,id',
             'genre_id' => 'required|exists:generos,id',
             'release_date' => 'required|date',
             'cover_image' => 'nullable|image|max:2048',
             'temp_cover_path' => 'nullable|string',
+            'songs' => 'nullable|array',
+            'songs.*.title' => 'required|string|max:255',
+            'songs.*.duration' => 'required|string|max:10',
         ]);
         
-        $albumData = [
-            'title' => $request->title,
-            'artist_id' => $request->artist_id,
-            'genre_id' => $request->genre_id,
-            'release_date' => $request->release_date,
-        ];
-        
-        // Procesamiento de imagen
-        if ($request->has('temp_cover_path') && !empty($request->temp_cover_path)) {
-            // Si se subió previamente una imagen temporal, usarla
-            $albumData['cover_image'] = $request->temp_cover_path;
-        } elseif ($request->hasFile('cover_image')) {
-            // Si se subió una imagen directamente
-            $albumData['cover_image'] = $request->file('cover_image')->store('covers', 'public');
+        if ($validator->fails()) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+            return redirect()->back()->withErrors($validator)->withInput();
         }
         
-        $album = Album::create($albumData);
+        // Empezar transacción para garantizar integridad
+        DB::beginTransaction();
         
-        if ($request->ajax()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Álbum creado correctamente',
-                'redirect' => route('admin.albums')
-            ]);
+        try {
+            $albumData = [
+                'title' => $request->title,
+                'artist_id' => $request->artist_id,
+                'genre_id' => $request->genre_id,
+                'release_date' => $request->release_date,
+            ];
+            
+            // Procesamiento de imagen
+            if ($request->has('temp_cover_path') && !empty($request->temp_cover_path)) {
+                // Si se subió previamente una imagen temporal, usarla
+                $albumData['cover_image'] = $request->temp_cover_path;
+            } elseif ($request->hasFile('cover_image')) {
+                // Si se subió una imagen directamente
+                $albumData['cover_image'] = $request->file('cover_image')->store('covers', 'public');
+            }
+            
+            $album = Album::create($albumData);
+            
+            // Procesar canciones si se enviaron
+            if ($request->has('songs') && is_array($request->songs)) {
+                foreach ($request->songs as $songData) {
+                    if (!empty($songData['title']) && !empty($songData['duration'])) {
+                        // Crear cada canción para este álbum
+                        $song = new \App\Models\Song([  
+                            'title' => $songData['title'],
+                            'duration' => $songData['duration'],
+                            'genre_id' => $request->genre_id, // Usar el mismo género del álbum
+                            'cover_image' => 'songs/default.jpg', // Imagen por defecto
+                            'play_count' => 0
+                        ]);
+                        
+                        $song->album_id = $album->id;
+                        $song->artist_id = $request->artist_id; // Usar el mismo artista del álbum
+                        $song->save();
+                    }
+                }
+            }
+            
+            // Commit de la transacción
+            DB::commit();
+            
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Álbum creado correctamente',
+                    'redirect' => route('admin.albums')
+                ]);
+            }
+            
+            return redirect()->route('admin.albums')
+                            ->with('success', 'Álbum creado correctamente.');
+                            
+        } catch (\Exception $e) {
+            // Revertir la transacción en caso de error
+            DB::rollBack();
+            
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al crear el álbum: ' . $e->getMessage()
+                ], 500);
+            }
+            
+            return redirect()->back()
+                ->with('error', 'Error al crear el álbum: ' . $e->getMessage())
+                ->withInput();
         }
-        
-        return redirect()->route('admin.albums')
-                        ->with('success', 'Álbum creado correctamente.');
     }
 
     /**
@@ -162,35 +218,97 @@ class AlbumController extends Controller
             abort(403, 'No tienes permiso para editar álbumes.');
         }
         
-        $request->validate([
+        $validator = validator($request->all(), [
             'title' => 'required|string|max:255',
             'artist_id' => 'required|exists:artistas,id',
             'genre_id' => 'required|exists:generos,id',
             'release_date' => 'required|date',
             'cover_image' => 'nullable|image|max:2048',
             'temp_cover_path' => 'nullable|string',
+            'songs' => 'nullable|array',
+            'songs.*.id' => 'nullable|exists:canciones,id',
+            'songs.*.title' => 'required|string|max:255',
+            'songs.*.duration' => 'required|string|max:10',
         ]);
         
-        $albumData = [
-            'title' => $request->title,
-            'artist_id' => $request->artist_id,
-            'genre_id' => $request->genre_id,
-            'release_date' => $request->release_date,
-        ];
-        
-        // Procesamiento de imagen
-        if ($request->has('temp_cover_path') && !empty($request->temp_cover_path)) {
-            // Si se subió previamente una imagen temporal, usarla
-            $albumData['cover_image'] = $request->temp_cover_path;
-        } elseif ($request->hasFile('cover_image')) {
-            // Si se subió una imagen directamente
-            $albumData['cover_image'] = $request->file('cover_image')->store('covers', 'public');
+        if ($validator->fails()) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+            return redirect()->back()->withErrors($validator)->withInput();
         }
         
-        // Usar transacción para actualizar el álbum
+        // Usamos una transacción de base de datos para garantizar la integridad
         DB::beginTransaction();
+        
         try {
+            $albumData = [
+                'title' => $request->title,
+                'artist_id' => $request->artist_id,
+                'genre_id' => $request->genre_id,
+                'release_date' => $request->release_date,
+            ];
+            
+            // Procesamiento de imagen
+            if ($request->has('temp_cover_path') && !empty($request->temp_cover_path)) {
+                // Si se subió previamente una imagen temporal, usarla
+                $albumData['cover_image'] = $request->temp_cover_path;
+            } elseif ($request->hasFile('cover_image')) {
+                // Si se subió una imagen directamente
+                $albumData['cover_image'] = $request->file('cover_image')->store('covers', 'public');
+            }
+            
             $album->update($albumData);
+            
+            // Procesar canciones si se enviaron
+            if ($request->has('songs') && is_array($request->songs)) {
+                $existingSongIds = [];
+                
+                foreach ($request->songs as $songData) {
+                    if (!empty($songData['title']) && !empty($songData['duration'])) {
+                        // Si tiene ID es una canción existente que se actualiza
+                        if (!empty($songData['id'])) {
+                            $song = \App\Models\Song::find($songData['id']);
+                            
+                            if ($song && $song->album_id == $album->id) {
+                                $song->title = $songData['title'];
+                                $song->duration = $songData['duration'];
+                                $song->save();
+                                
+                                $existingSongIds[] = $song->id;
+                            }
+                        } else {
+                            // Es una nueva canción para este álbum
+                            $song = new \App\Models\Song([
+                                'title' => $songData['title'],
+                                'duration' => $songData['duration'],
+                                'genre_id' => $request->genre_id, // Usar el mismo género del álbum
+                                'cover_image' => 'songs/default.jpg', // Imagen por defecto
+                                'play_count' => 0
+                            ]);
+                            
+                            $song->album_id = $album->id;
+                            $song->artist_id = $request->artist_id; // Usar el mismo artista del álbum
+                            $song->save();
+                            
+                            $existingSongIds[] = $song->id;
+                        }
+                    }
+                }
+                
+                // Opcionalmente: eliminar canciones que ya no están en la lista enviada
+                // Descomenta estas líneas si quieres que se eliminen las canciones que no se enviaron
+                /*
+                if (!empty($existingSongIds)) {
+                    \App\Models\Song::where('album_id', $album->id)
+                        ->whereNotIn('id', $existingSongIds)
+                        ->delete();
+                }
+                */
+            }
             
             DB::commit();
             

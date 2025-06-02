@@ -13,10 +13,37 @@ class SongSeeder extends Seeder
         $songs = [];
         $albums = \App\Models\Album::all();
         
+        // Títulos de canciones genéricos para usar en el seeder
+        $songTitles = [
+            'Amanecer',
+            'Sueño Eterno',
+            'Horizontes',
+            'Luna Llena',
+            'Corazón de Cristal',
+            'Tiempo de Vivir', 
+            'Camino Infinito',
+            'Viento Libre',
+            'Mar de Emociones',
+            'Melodia Nocturna',
+            'Esperanza',
+            'Fuego Interior',
+            'Destino Final',
+            'Nueva Era',
+            'Luz Eterna',
+            'Recuerdos',
+            'En Silencio',
+            'Alma Perdida',
+            'Libertad',
+            'Eclipse'            
+        ];
+        
         foreach ($albums as $album) {
-            for ($i = 1; $i <= 5; $i++) {
+            // Mezclar los títulos para cada álbum
+            shuffle($songTitles);
+            
+            for ($i = 0; $i < 5; $i++) {
                 $songs[] = [
-                    'title' => 'Canción '.$i.' del álbum '.$album->title,
+                    'title' => $songTitles[$i],
                     'duration' => rand(2, 5).':'.str_pad(rand(0, 59), 2, '0', STR_PAD_LEFT),
                     'album_id' => $album->id,
                     'artist_id' => $album->artist_id,

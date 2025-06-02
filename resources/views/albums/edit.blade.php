@@ -76,6 +76,65 @@
                 </div>
             </div>
 
+            <div class="mt-8 border-t pt-6">
+                <h3 class="text-lg font-semibold mb-4">Canciones del álbum</h3>
+                <p class="text-sm text-gray-600 mb-4">Edita las canciones existentes o añade nuevas canciones a este álbum.</p>
+                
+                <div id="songs-container" class="space-y-4">
+                    <!-- Aquí se mostrarán las canciones existentes del álbum -->
+                    @foreach($album->songs as $index => $song)
+                    <div class="song-row grid grid-cols-1 md:grid-cols-5 gap-4 items-center border-b pb-2">
+                        <input type="hidden" name="songs[{{ $index }}][id]" value="{{ $song->id }}">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Título</label>
+                            <input type="text" name="songs[{{ $index }}][title]" value="{{ $song->title }}" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="Título de la canción">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Duración (mm:ss)</label>
+                            <input type="text" name="songs[{{ $index }}][duration]" value="{{ $song->duration }}" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="3:45">
+                        </div>
+                        <div class="flex items-end">
+                            <button type="button" class="remove-song bg-red-500 text-white p-2 rounded-md hover:bg-red-600" title="Eliminar canción">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    @endforeach
+                    
+                    <!-- Si no hay canciones, mostramos una fila vacía para añadir una -->
+                    @if($album->songs->isEmpty())
+                    <div class="song-row grid grid-cols-1 md:grid-cols-5 gap-4 items-center border-b pb-2">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Título</label>
+                            <input type="text" name="songs[0][title]" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="Título de la canción">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Duración (mm:ss)</label>
+                            <input type="text" name="songs[0][duration]" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="3:45">
+                        </div>
+                        <div class="flex items-end">
+                            <button type="button" class="remove-song bg-red-500 text-white p-2 rounded-md hover:bg-red-600" title="Eliminar canción">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    @endif
+                </div>
+                
+                <div class="mt-4">
+                    <button type="button" id="add-song" class="border border-gray-400 bg-white text-gray-700 py-2 px-4 rounded-md hover:bg-gray-100 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                        </svg>
+                        Añadir otra canción
+                    </button>
+                </div>
+            </div>
+
             <div class="mt-6 text-right">
                 <button type="submit" class="btn-spotify py-2 px-6">
                     Actualizar Álbum
@@ -147,6 +206,82 @@
         });
         
         // Manejar envío del formulario mediante AJAX
+        // Gestión dinámica de canciones
+        let songCounter = {{ count($album->songs) }}; // Empezamos con el número de canciones existentes
+        
+        // Añadir nueva canción
+        document.getElementById('add-song').addEventListener('click', function() {
+            const songsContainer = document.getElementById('songs-container');
+            
+            const newSongRow = document.createElement('div');
+            newSongRow.className = 'song-row grid grid-cols-1 md:grid-cols-5 gap-4 items-center border-b pb-2';
+            newSongRow.innerHTML = `
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Título</label>
+                    <input type="text" name="songs[${songCounter}][title]" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="Título de la canción">
+                    <div class="error-message text-red-500 text-sm mt-1" id="songs.${songCounter}.title-error"></div>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Duración (mm:ss)</label>
+                    <input type="text" name="songs[${songCounter}][duration]" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="3:45">
+                    <div class="error-message text-red-500 text-sm mt-1" id="songs.${songCounter}.duration-error"></div>
+                </div>
+                <div class="flex items-end">
+                    <button type="button" class="remove-song bg-red-500 text-white p-2 rounded-md hover:bg-red-600" title="Eliminar canción">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+            `;
+            songsContainer.appendChild(newSongRow);
+            songCounter++;
+        });
+
+        // Eliminar una canción (usando delegación de eventos)
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.remove-song')) {
+                const songRow = e.target.closest('.song-row');
+                
+                // Efecto de fade out y luego eliminar
+                songRow.style.opacity = '0';
+                songRow.style.transition = 'opacity 0.3s';
+                
+                setTimeout(() => {
+                    songRow.remove();
+                    
+                    // Verificar si no queda ninguna fila y añadir una vacía
+                    const songRows = document.querySelectorAll('.song-row');
+                    if (songRows.length === 0) {
+                        const songsContainer = document.getElementById('songs-container');
+                        const emptyRow = document.createElement('div');
+                        emptyRow.className = 'song-row grid grid-cols-1 md:grid-cols-5 gap-4 items-center border-b pb-2';
+                        emptyRow.innerHTML = `
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Título</label>
+                                <input type="text" name="songs[0][title]" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="Título de la canción">
+                                <div class="error-message text-red-500 text-sm mt-1" id="songs.0.title-error"></div>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Duración (mm:ss)</label>
+                                <input type="text" name="songs[0][duration]" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="3:45">
+                                <div class="error-message text-red-500 text-sm mt-1" id="songs.0.duration-error"></div>
+                            </div>
+                            <div class="flex items-end">
+                                <button type="button" class="remove-song bg-red-500 text-white p-2 rounded-md hover:bg-red-600" title="Eliminar canción">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                        `;
+                        songsContainer.appendChild(emptyRow);
+                        songCounter = 1;
+                    }
+                }, 300);
+            }
+        });
+
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             
