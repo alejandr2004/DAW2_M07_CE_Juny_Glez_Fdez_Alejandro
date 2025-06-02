@@ -22,19 +22,12 @@
                                     data-description="{{ $genre->description }}">
                                 Editar
                             </button>
-                            @if($genre->songs_count == 0)
-                                <button class="delete-button bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded text-sm"
-                                        data-url="{{ route('admin.genres.destroy', $genre) }}"
-                                        data-name="{{ $genre->name }}"
-                                        data-type="género">
-                                    Eliminar
-                                </button>
-                            @else
-                                <button class="bg-gray-300 text-gray-500 py-1 px-2 rounded text-sm cursor-not-allowed" 
-                                        title="No se puede eliminar porque tiene canciones asociadas">
-                                    Eliminar
-                                </button>
-                            @endif
+                            <button class="delete-button bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded text-sm"
+                                    data-url="{{ route('admin.genres.destroy', $genre) }}"
+                                    data-name="{{ $genre->name }}"
+                                    data-type="género">
+                                Eliminar
+                            </button>
                         </td>
                     </tr>
                 @endforeach

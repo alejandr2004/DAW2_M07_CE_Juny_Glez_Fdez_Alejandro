@@ -44,6 +44,14 @@ class AuthController extends Controller
                 ]);
             }
 
+            // Verificar si la cuenta está deshabilitada
+            if ($user->is_disabled) {
+                Auth::logout();
+                return back()->withErrors([
+                    'email' => 'Esta cuenta ha sido deshabilitada por un administrador. Contacte con soporte para más información.',
+                ]);
+            }
+
             // Redireccionar según el rol del usuario
             if ($user->role === 'admin') {
                 return redirect()->intended(route('admin.dashboard'));

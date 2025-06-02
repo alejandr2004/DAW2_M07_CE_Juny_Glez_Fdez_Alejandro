@@ -52,9 +52,9 @@
                 <div class="md:w-3/4">
                     <h1 class="text-3xl font-bold mb-2">{{ $song->title }}</h1>
                     <div class="mb-4">
-                        <a href="{{ route('artists.show', $song->artist) }}" class="text-xl text-spotify hover:underline">
-                            {{ $song->artist->name }}
-                        </a>
+                        <span class="text-xl text-gray-700">
+                            {{ $song->artist ? $song->artist->nombre : 'Artista desconocido' }}
+                        </span>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -80,13 +80,10 @@
                         </div>
                     </div>
 
-                    <!-- Botón de reproducción con contador de plays -->
-                    <form action="{{ route('songs.play', $song) }}" method="POST" class="mb-6">
-                        @csrf
-                        <button type="submit" class="btn-spotify py-2 px-6">
-                            <i class="fas fa-play mr-2"></i> Reproducir
-                        </button>
-                    </form>
+                    <!-- Nota informativa sobre la simulación -->
+                    <div class="bg-gray-100 p-3 mb-6 rounded-lg text-gray-700">
+                        <p><i class="fas fa-info-circle mr-2"></i> Esta es una simulación. La reproducción de música no está disponible.</p>
+                    </div>
 
                     @auth
                         <!-- Opciones de playlist para usuarios autenticados -->
@@ -133,14 +130,10 @@
                                     <a href="{{ route('songs.edit', $song) }}" class="btn-secondary py-1 px-3 text-sm">
                                         Editar canción
                                     </a>
-                                    <form action="{{ route('songs.destroy', $song) }}" method="POST" class="inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn-danger py-1 px-3 text-sm" 
-                                                onclick="return confirm('¿Estás seguro? Esta acción no se puede deshacer.')">
-                                            Eliminar canción
-                                        </button>
-                                    </form>
+                                    <button type="button" class="btn-danger py-1 px-3 text-sm delete-song-btn" 
+                                            data-song-id="{{ $song->id }}" data-song-title="{{ $song->title }}">
+                                        Eliminar canción
+                                    </button>
                                 </div>
                             </div>
                         @endif
@@ -150,4 +143,9 @@
         </div>
     </div>
 </div>
+
+@push('scripts')
+<script src="{{ asset('js/song-detail-ajax.js') }}"></script>
+@endpush
+
 @endsection

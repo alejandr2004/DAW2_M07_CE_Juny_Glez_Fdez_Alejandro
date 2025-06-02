@@ -84,10 +84,16 @@ class ArtistController extends Controller
             'pais' => 'nullable|string|max:100'
         ]);
         
-        // Manejar la subida de la imagen
+        // Manejar la subida de la imagen pero sin guardar la ruta en la base de datos
         if ($request->hasFile('imagen')) {
-            $path = $request->file('imagen')->store('artists', 'public');
-            $validated['imagen'] = $path;
+            // Simplemente subimos la imagen pero no guardamos la ruta
+            $request->file('imagen')->store('artists', 'public');
+        }
+        
+        // Eliminamos el campo imagen del array validated antes de crear el artista
+        // ya que este campo no existe en la tabla de la base de datos
+        if (isset($validated['imagen'])) {
+            unset($validated['imagen']);
         }
         
         $artist = Artist::create($validated);

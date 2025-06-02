@@ -6,25 +6,23 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
+    public function up()
     {
         Schema::create('albums', function (Blueprint $table) {
             $table->id();
-            $table->string('title', 100);
-            $table->foreignId('artist_id')->constrained()->onDelete('cascade');
-            $table->string('cover_image')->nullable();
-            $table->year('release_year')->nullable();
+            $table->string('title');
+            $table->date('release_date');
+            $table->unsignedBigInteger('artist_id');
+            $table->unsignedBigInteger('genre_id');
+            $table->string('cover_image')->nullable(); // Columna añadida
             $table->timestamps();
+
+            $table->foreign('artist_id')->references('id')->on('artistas');
+            $table->foreign('genre_id')->references('id')->on('generos');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
+    public function down()
     {
         Schema::dropIfExists('albums');
     }

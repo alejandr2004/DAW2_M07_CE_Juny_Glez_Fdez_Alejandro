@@ -19,12 +19,13 @@
             </a>
         </div>
         
-        <form class="ajax-filter-form" data-target="content-container">
+        <form class="ajax-filter-form" action="{{ route('admin.albums') }}" method="POST" data-target="content-container">
+            @csrf
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                     <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
                     <div class="relative">
-                        <input type="text" name="search" id="search" placeholder="Título o artista..." class="w-full border-gray-300 rounded-md shadow-sm focus:ring-spotify focus:border-spotify pr-10">
+                        <input type="text" name="search" id="search" placeholder="Título o artista..." class="w-full border-gray-300 rounded-md shadow-sm focus:ring-spotify focus:border-spotify pr-10" value="{{ request('search') }}">
                         <div class="absolute inset-y-0 right-0 flex items-center pr-3">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
@@ -37,6 +38,25 @@
                     <label for="artist" class="block text-sm font-medium text-gray-700 mb-1">Artista</label>
                     <input type="text" name="artist" id="artist" placeholder="Buscar por artista..." class="w-full border-gray-300 rounded-md shadow-sm focus:ring-spotify focus:border-spotify" value="{{ request('artist') }}">
                 </div>
+
+                <div>
+                    <label for="sort" class="block text-sm font-medium text-gray-700 mb-1">Ordenar por</label>
+                    <select name="sort" id="sort" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-spotify focus:border-spotify">
+                        <option value="title" {{ request('sort') == 'title' ? 'selected' : '' }}>Título (A-Z)</option>
+                        <option value="artist" {{ request('sort') == 'artist' ? 'selected' : '' }}>Artista (A-Z)</option>
+                        <option value="release_date" {{ request('sort') == 'release_date' ? 'selected' : '' }}>Año (Más reciente)</option>
+                        <option value="songs_count" {{ request('sort') == 'songs_count' ? 'selected' : '' }}>Número de canciones</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="flex justify-end space-x-2">
+                <button type="button" class="clear-filters-btn px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    Limpiar filtros
+                </button>
+                <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-spotify hover:bg-spotify-dark">
+                    Filtrar
+                </button>
             </div>
         </form>
     </div>

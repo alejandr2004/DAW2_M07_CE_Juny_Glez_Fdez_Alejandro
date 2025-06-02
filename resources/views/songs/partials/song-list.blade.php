@@ -24,15 +24,14 @@
                 <div class="p-4 flex-grow flex flex-col">
                     <h3 class="font-bold text-lg mb-1 line-clamp-1">{{ $song->title }}</h3>
                     <p class="text-gray-600 mb-2 line-clamp-1">
-                        <a href="{{ route('artists.show', $song->artist) }}" class="hover:text-spotify">
-                            {{ $song->artist->nombre }}
-                        </a>
+                        <!-- Removido enlace a artista ya que no existe ruta artists.show -->
+                        {{ $song->artist ? $song->artist->nombre : 'Artista desconocido' }}
                     </p>
                     <div class="flex items-center justify-between mt-auto pt-2">
                         <span class="inline-flex items-center px-2 py-1 bg-gray-100 text-xs rounded-full">
                             {{ $song->genre->name }}
                         </span>
-                        <span class="text-gray-500 text-sm">{{ gmdate("i:s", $song->duration) }}</span>
+                        <span class="text-gray-500 text-sm">{{ gmdate("i:s", (int)$song->duration) }}</span>
                     </div>
                 </div>
             </div>

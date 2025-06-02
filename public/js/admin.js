@@ -3,6 +3,29 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Configurar el token CSRF para todas las peticiones AJAX
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    
+    // Configurar fetch para incluir el token CSRF en todas las peticiones
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+        if (!options.headers) {
+            options.headers = {};
+        }
+        
+        // Añadir el token CSRF a todas las peticiones
+        if (!options.headers['X-CSRF-TOKEN']) {
+            options.headers['X-CSRF-TOKEN'] = csrfToken;
+        }
+        
+        // Añadir el encabezado X-Requested-With para identificar peticiones AJAX
+        if (!options.headers['X-Requested-With']) {
+            options.headers['X-Requested-With'] = 'XMLHttpRequest';
+        }
+        
+        return originalFetch(url, options);
+    };
+    
     // Inicializar manejadores
     initializeFilters();
     initializeAdminActions();
@@ -33,7 +56,7 @@ function initializeFilters() {
             });
         });
 
-        // Manejar búsqueda con debounce
+        // Manejar búsqueda con debounce reducido para actualizaciones más rápidas
         const searchInputs = form.querySelectorAll('input[type="text"], input[type="search"]');
         searchInputs.forEach(input => {
             let debounceTimer;
@@ -41,7 +64,7 @@ function initializeFilters() {
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => {
                     submitFilterForm(form);
-                }, 500); // Esperar 500ms después de que el usuario deje de escribir
+                }, 200); // Reducido a 200ms para una respuesta más rápida
             });
         });
 
@@ -50,53 +73,132 @@ function initializeFilters() {
             e.preventDefault();
             submitFilterForm(form);
         });
+        
+        // Manejar botones de limpiar filtros
+        const clearButton = form.querySelector('.clear-filters-btn');
+        if (clearButton) {
+            clearButton.addEventListener('click', () => {
+                form.reset();
+                submitFilterForm(form);
+            });
+        }
+        
+        // Manejar botones de reset específicos
+        const resetButton = document.getElementById('reset-filters');
+        if (resetButton) {
+            resetButton.addEventListener('click', () => {
+                form.reset();
+                submitFilterForm(form);
+            });
+        }
+        
+        // Manejar los clics en los enlaces de paginación
+        document.addEventListener('click', function(e) {
+            const paginationLink = e.target.closest('.pagination a');
+            if (paginationLink) {
+                e.preventDefault();
+                const url = new URL(paginationLink.href);
+                const pageParam = url.searchParams.get('page');
+                
+                if (pageParam) {
+                    // Crear o actualizar el input oculto para la página
+                    let pageInput = form.querySelector('input[name="page"]');
+                    if (!pageInput) {
+                        pageInput = document.createElement('input');
+                        pageInput.type = 'hidden';
+                        pageInput.name = 'page';
+                        form.appendChild(pageInput);
+                    }
+                    pageInput.value = pageParam;
+                    
+                    // Enviar el formulario
+                    submitFilterForm(form);
+                }
+            }
+        });
     });
 }
 
 /**
- * Envía el formulario de filtro mediante AJAX
+ * Envía el formulario de filtro mediante AJAX usando Fetch API
  */
 function submitFilterForm(form) {
     const targetContainerId = form.dataset.target || 'content-container';
     const targetContainer = document.getElementById(targetContainerId);
     const paginationContainer = document.getElementById('pagination-container');
     const formData = new FormData(form);
-    const url = form.action;
-
+    
+    // Añadir token CSRF al FormData si no existe
+    if (!formData.has('_token')) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        formData.append('_token', csrfToken);
+    }
+    
     // Mostrar indicador de carga
     if (targetContainer) {
         targetContainer.innerHTML = '<div class="flex justify-center items-center p-12"><div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-spotify"></div></div>';
     }
-
-    // Realizar petición AJAX
+    
+    const url = form.getAttribute('action');
+    
+    // Depurar qué datos se están enviando
+    console.log('Enviando datos del formulario:');
+    for (let pair of formData.entries()) {
+        console.log(pair[0] + ': ' + pair[1]);
+    }
+    
     fetch(url, {
-        method: 'GET',
+        method: 'POST',
+        body: formData,
         headers: {
-            'X-Requested-With': 'XMLHttpRequest'
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
         },
-        // No podemos enviar FormData directamente en GET, convertimos a parámetros de URL
-        // y los añadimos a la URL
+        credentials: 'same-origin'
     })
     .then(response => {
+        console.log('Estado de la respuesta:', response.status);
+        
+        // Si tenemos errores de validación (422), continuamos pero logueamos los errores
+        if (response.status === 422) {
+            return response.json().then(data => {
+                console.error('Errores de validación:', data.errors || data);
+                // En lugar de lanzar un error, intentamos cargar la página sin filtros
+                window.location.href = url.split('?')[0]; // Recargar sin parámetros
+                return { html: 'Recargando...', pagination: '' };
+            });
+        }
+        
         if (!response.ok) {
-            throw new Error('Error en la petición AJAX');
+            throw new Error('Error en la respuesta del servidor: ' + response.status);
         }
         return response.json();
     })
     .then(data => {
-        if (targetContainer) {
-            targetContainer.innerHTML = data.html || '';
+        console.log('Datos recibidos del servidor:', data);
+        
+        // Actualizar el contenido
+        if (data.html) {
+            if (targetContainer) {
+                targetContainer.innerHTML = data.html;
+            }
+            
+            // Actualizar la paginación si existe
+            if (paginationContainer && data.pagination) {
+                paginationContainer.innerHTML = data.pagination;
+            }
+            
+            // Re-inicializar los botones de acción
+            initializeAdminActions();
+            
+            // Actualizar URL para permitir recargar la página
+            updateUrlWithFormData(formData);
         }
-        if (paginationContainer && data.pagination) {
-            paginationContainer.innerHTML = data.pagination;
-        }
-        // Actualizar URL para reflejar los filtros
-        window.history.pushState({}, '', form.action + '?' + new URLSearchParams(formData).toString());
     })
     .catch(error => {
-        console.error('Error:', error);
+        console.error('Error en la petición Fetch:', error);
         if (targetContainer) {
-            targetContainer.innerHTML = '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert"><p>Error al cargar los datos. Por favor, inténtelo de nuevo.</p></div>';
+            targetContainer.innerHTML = '<div class="p-4 bg-red-100 text-red-700 rounded">Error al cargar los resultados: ' + error.message + '</div>';
         }
     });
 }
@@ -173,9 +275,18 @@ function initializeAjaxForms() {
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json'
                 },
-                body: method !== 'GET' ? formData : null
+                body: method !== 'GET' ? formData : null,
+                credentials: 'same-origin'
             })
-            .then(response => response.json())
+            .then(response => {
+                // Si la respuesta no es OK, lanzar un error para manejarlo en el catch
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || `Error en la respuesta: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
                 // Restaurar botón
                 if (submitButton) {
@@ -204,6 +315,13 @@ function initializeAjaxForms() {
                             if (updateTarget) {
                                 updateTarget.innerHTML = data.html;
                             }
+                        }
+                        
+                        // Si es el formulario de toggle disabled, recargar la página
+                        if (url.includes('toggleDisabled')) {
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
                         }
                     }
                 } else {
@@ -324,18 +442,15 @@ function confirmDelete(url, itemName, itemType) {
                         window.location.href = data.redirect;
                     }, 1500);
                 } else {
-                    // Eliminar el elemento de la lista si existe
-                    const item = document.querySelector(`[data-id="${data.id}"]`);
-                    if (item) {
-                        item.remove();
-                    }
+                    // Actualizar la lista completa mediante AJAX
+                    const contentContainer = document.getElementById('content-container');
+                    const paginationContainer = document.getElementById('pagination-container');
                     
-                    // Actualizar contenido si es necesario
-                    if (data.html && data.updateTarget) {
-                        const updateTarget = document.getElementById(data.updateTarget);
-                        if (updateTarget) {
-                            updateTarget.innerHTML = data.html;
-                        }
+                    if (contentContainer) {
+                        // Obtener la URL actual sin parámetros
+                        const currentUrl = window.location.pathname;
+                        // Recargar la lista completa
+                        loadContentViaAjax(currentUrl, contentContainer, paginationContainer);
                     }
                 }
             } else {
@@ -359,12 +474,41 @@ function loadContentViaAjax(url, targetContainer, paginationContainer) {
     // Mostrar indicador de carga
     targetContainer.innerHTML = '<div class="flex justify-center items-center p-12"><div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-spotify"></div></div>';
     
-    // Realizar petición AJAX
-    fetch(url, {
-        method: 'GET',
+    console.log('Cargando contenido AJAX desde URL:', url);
+    
+    // Extraer parámetros de la URL para la petición POST
+    const urlObj = new URL(url, window.location.origin);
+    const params = new URLSearchParams(urlObj.search);
+    
+    // Crear FormData con los parámetros de la URL
+    const formData = new FormData();
+    for (const [key, value] of params.entries()) {
+        formData.append(key, value);
+        console.log('Parámetro:', key, value);
+    }
+    
+    // Añadir el token CSRF
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    formData.append('_token', csrfToken);
+    
+    // Verificar si es una URL de paginación y si contiene el parámetro page
+    if (!formData.has('page') && url.includes('page=')) {
+        const pageMatch = url.match(/page=(\d+)/);
+        if (pageMatch && pageMatch[1]) {
+            formData.append('page', pageMatch[1]);
+            console.log('Añadido parámetro de página:', pageMatch[1]);
+        }
+    }
+    
+    console.log('Enviando petición POST a:', urlObj.pathname);
+    
+    // Realizar petición AJAX usando POST
+    fetch(urlObj.pathname, {
+        method: 'POST',
         headers: {
             'X-Requested-With': 'XMLHttpRequest'
-        }
+        },
+        body: formData
     })
     .then(response => {
         if (!response.ok) {
@@ -398,40 +542,63 @@ function initializeAjaxPagination() {
             event.preventDefault();
             const link = event.target.closest('.ajax-pagination-link');
             const url = link.getAttribute('href');
+            const page = link.getAttribute('data-page');
             const contentContainer = document.getElementById('content-container');
             const paginationContainer = document.getElementById('pagination-container');
             
+            console.log('Click en paginación AJAX:', { url, page });
+            
             if (contentContainer && url) {
-                loadContentViaAjax(url, contentContainer, paginationContainer);
+                // Crear una URL con el parámetro de página
+                const currentPath = window.location.pathname;
+                const currentParams = new URLSearchParams(window.location.search);
+                
+                // Actualizar o añadir el parámetro page
+                if (page) {
+                    currentParams.set('page', page);
+                }
+                
+                // Construir la nueva URL
+                const newUrl = currentPath + '?' + currentParams.toString();
+                console.log('URL para paginación:', newUrl);
+                
+                loadContentViaAjax(newUrl, contentContainer, paginationContainer);
             }
         }
     });
 }
 
 /**
- * Muestra una notificación en la pantalla
+ * Muestra una notificación en la pantalla usando SweetAlert
  */
 function showNotification(message, type = 'success') {
-    // Crear elemento de notificación
-    const notification = document.createElement('div');
-    notification.className = `fixed top-4 right-4 p-4 rounded shadow-lg transform transition-transform duration-300 z-50 ${
-        type === 'success' ? 'bg-green-100 text-green-800 border-l-4 border-green-500' : 'bg-red-100 text-red-800 border-l-4 border-red-500'
-    }`;
-    notification.style.transform = 'translateX(100%)';
-    notification.innerHTML = `<p>${message}</p>`;
+    Swal.fire({
+        icon: type,
+        title: type === 'success' ? 'Éxito' : 'Error',
+        text: message,
+        confirmButtonColor: '#1DB954'
+    });
+}
+
+/**
+ * Las funciones específicas para el formulario de canciones han sido eliminadas
+ * ya que ahora todos los formularios usan la implementación estándar de submitFilterForm    
+
+// Esta función ha sido reemplazada por submitFilterForm
+
+/**
+ * Actualiza la URL del navegador con los parámetros del formulario
+ */
+function updateUrlWithFormData(formData) {
+    const params = new URLSearchParams();
     
-    document.body.appendChild(notification);
+    formData.forEach((value, key) => {
+        // No incluir el token CSRF ni valores vacíos en la URL
+        if (key !== '_token' && value) {
+            params.append(key, value);
+        }
+    });
     
-    // Animar entrada
-    setTimeout(() => {
-        notification.style.transform = 'translateX(0)';
-    }, 10);
-    
-    // Eliminar después de un tiempo
-    setTimeout(() => {
-        notification.style.transform = 'translateX(100%)';
-        setTimeout(() => {
-            document.body.removeChild(notification);
-        }, 300);
-    }, 5000);
+    const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    window.history.pushState({}, '', newUrl);
 }

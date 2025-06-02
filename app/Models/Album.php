@@ -2,43 +2,25 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Album extends Model
 {
-    use HasFactory;
+    protected $fillable = ['title', 'release_date', 'artist_id', 'genre_id'];
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
-    protected $fillable = [
-        'title',
-        'artist',
-        'release_year',
-        'cover_image',
-    ];
+    public function artist()
+    {
+        return $this->belongsTo(Artist::class);
+    }
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
-    protected $casts = [
-        'release_year' => 'integer'
-    ];
-
-    // El artista ahora es un campo string, no una relación
-
-    /**
-     * Get songs in this album
-     */
-    public function songs(): HasMany
+    public function songs()
     {
         return $this->hasMany(Song::class);
+    }
+
+    // Relación con género (añadida por consistencia)
+    public function genre()
+    {
+        return $this->belongsTo(Genre::class);
     }
 }

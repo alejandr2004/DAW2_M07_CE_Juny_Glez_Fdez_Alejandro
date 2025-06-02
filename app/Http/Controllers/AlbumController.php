@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Album;
-// Artist eliminado
+use App\Models\Artist;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -74,7 +75,10 @@ class AlbumController extends Controller
             abort(403, 'No tienes permiso para crear álbumes.');
         }
         
-        return view('albums.create');
+        // Obtener artistas para el formulario
+        $artists = Artist::orderBy('nombre')->get();
+        
+        return view('albums.create', compact('artists'));
     }
 
     /**
@@ -92,13 +96,19 @@ class AlbumController extends Controller
         
         $request->validate([
             'title' => 'required|string|max:255',
-            'artist' => 'required|string|max:255',
-            'release_year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
+            'artist_id' => 'required|exists:artistas,id',
+            'genre_id' => 'required|exists:generos,id',
+            'release_date' => 'required|date',
             'cover_image' => 'nullable|image|max:2048',
             'temp_cover_path' => 'nullable|string',
         ]);
         
-        $albumData = $request->only(['title', 'artist', 'release_year']);
+        $albumData = [
+            'title' => $request->title,
+            'artist_id' => $request->artist_id,
+            'genre_id' => $request->genre_id,
+            'release_date' => $request->release_date,
+        ];
         
         // Procesamiento de imagen
         if ($request->has('temp_cover_path') && !empty($request->temp_cover_path)) {
@@ -133,6 +143,9 @@ class AlbumController extends Controller
             abort(403, 'No tienes permiso para editar álbumes.');
         }
         
+        // Cargar las relaciones necesarias
+        $album->load(['artist', 'songs']);
+        
         return view('albums.edit', compact('album'));
     }
 
@@ -151,13 +164,19 @@ class AlbumController extends Controller
         
         $request->validate([
             'title' => 'required|string|max:255',
-            'artist' => 'required|string|max:255',
-            'release_year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
+            'artist_id' => 'required|exists:artistas,id',
+            'genre_id' => 'required|exists:generos,id',
+            'release_date' => 'required|date',
             'cover_image' => 'nullable|image|max:2048',
             'temp_cover_path' => 'nullable|string',
         ]);
         
-        $albumData = $request->only(['title', 'artist', 'release_year']);
+        $albumData = [
+            'title' => $request->title,
+            'artist_id' => $request->artist_id,
+            'genre_id' => $request->genre_id,
+            'release_date' => $request->release_date,
+        ];
         
         // Procesamiento de imagen
         if ($request->has('temp_cover_path') && !empty($request->temp_cover_path)) {
@@ -168,18 +187,36 @@ class AlbumController extends Controller
             $albumData['cover_image'] = $request->file('cover_image')->store('covers', 'public');
         }
         
-        $album->update($albumData);
-        
-        if ($request->ajax()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Álbum actualizado correctamente',
-                'redirect' => route('admin.albums')
-            ]);
+        // Usar transacción para actualizar el álbum
+        DB::beginTransaction();
+        try {
+            $album->update($albumData);
+            
+            DB::commit();
+            
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Álbum actualizado correctamente',
+                    'redirect' => route('admin.albums')
+                ]);
+            }
+            
+            return redirect()->route('admin.albums')
+                            ->with('success', 'Álbum actualizado correctamente.');
+        } catch (\Exception $e) {
+            DB::rollback();
+            
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al actualizar el álbum: ' . $e->getMessage()
+                ], 500);
+            }
+            
+            return redirect()->back()
+                ->with('error', 'Error al actualizar el álbum: ' . $e->getMessage());
         }
-        
-        return redirect()->route('admin.albums')
-                        ->with('success', 'Álbum actualizado correctamente.');
     }
 
     /**
@@ -196,6 +233,7 @@ class AlbumController extends Controller
         }
         
         // Usar transacción para eliminar el álbum y actualizar relaciones
+        // Desactivamos auto-commit
         DB::beginTransaction();
         try {
             // Desvincular todas las canciones de este álbum
@@ -204,6 +242,7 @@ class AlbumController extends Controller
             // Eliminar el álbum
             $album->delete();
             
+            // Commit de la transacción
             DB::commit();
             
             if (request()->ajax()) {
@@ -216,6 +255,7 @@ class AlbumController extends Controller
             return redirect()->route('admin.albums')
                             ->with('success', 'Álbum eliminado correctamente.');
         } catch (\Exception $e) {
+            // Revertimos la transacción en caso de error
             DB::rollback();
             
             if (request()->ajax()) {
@@ -225,7 +265,7 @@ class AlbumController extends Controller
                 ], 500);
             }
             
-            return redirect()->route('albums.index')
+            return redirect()->route('admin.albums')
                 ->with('error', 'Error al eliminar el álbum: ' . $e->getMessage());
         }
     }

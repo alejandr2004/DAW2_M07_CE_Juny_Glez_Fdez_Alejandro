@@ -6,7 +6,7 @@
 
     <!-- Filtros de búsqueda -->
     <div class="bg-white p-4 rounded-lg shadow mb-6">
-        <form action="{{ route('songs.index') }}" method="GET">
+        <form id="song-filter-form" action="{{ route('songs.index') }}" method="GET">
             <div class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
                 <!-- Búsqueda por título o artista -->
                 <div class="md:col-span-4">
@@ -21,16 +21,19 @@
                     <select name="artist" id="artist" class="form-control w-full">
                         <option value="">Todos los artistas</option>
                         @foreach($artists as $artist)
-                            <option value="{{ $artist->id }}" {{ request('artist') == $artist->id ? 'selected' : '' }}>
-                                {{ $artist->name }}
+                            <option value="{{ $artist->nombre }}" {{ request('artist') == $artist->nombre ? 'selected' : '' }}>
+                                {{ $artist->nombre }}
                             </option>
                         @endforeach
                     </select>
                 </div>
                 
-                <!-- Botón de filtrar -->
+                <!-- Botones de acción -->
                 <div class="md:col-span-4 self-end">
-                    <button type="submit" class="btn-spotify py-2 px-4 w-full">Aplicar filtros</button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="submit" class="btn-spotify py-2 px-4 w-full">Aplicar filtros</button>
+                        <button type="button" id="reset-filters-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded">Limpiar</button>
+                    </div>
                 </div>
             </div>
             
@@ -50,7 +53,16 @@
         </form>
     </div>
 
+    <!-- Indicador de carga -->
+    <div id="loading-indicator" class="hidden">
+        <div class="bg-white p-3 mb-4 rounded shadow text-center">
+            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-spotify mr-2"></div>
+            <span>Cargando canciones...</span>
+        </div>
+    </div>
+
     <!-- Lista de canciones -->
+    <div id="songs-container">
     @if($songs->count() > 0)
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             @foreach($songs as $song)
@@ -113,6 +125,7 @@
             @endif
         </div>
     @endif
+    </div>
 
     @auth
         @if(auth()->user()->role === 'admin')
@@ -122,4 +135,100 @@
         @endif
     @endauth
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('song-filter-form');
+        const songsContainer = document.getElementById('songs-container');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const resetBtn = document.getElementById('reset-filters-btn');
+        const searchInput = document.getElementById('search');
+        const artistSelect = document.getElementById('artist');
+        const genreCheckboxes = document.querySelectorAll('input[name="genres[]"]');
+        
+        // Manejar envío del formulario
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            loadSongsViaAjax();
+        });
+
+        // Manejar click en botón de reset
+        resetBtn.addEventListener('click', function() {
+            form.reset();
+            loadSongsViaAjax();
+        });
+
+        // Delegación de eventos para la paginación
+        document.addEventListener('click', function(e) {
+            const paginationLink = e.target.closest('.pagination a');
+            if (paginationLink) {
+                e.preventDefault();
+                const pageUrl = paginationLink.href;
+                const pageNumber = new URL(pageUrl).searchParams.get('page') || 1;
+                loadSongsViaAjax(pageNumber);
+            }
+        });
+
+        // Función para cargar canciones con AJAX
+        function loadSongsViaAjax(page = 1) {
+            // Mostrar indicador de carga
+            loadingIndicator.classList.remove('hidden');
+
+            // Construir FormData del formulario
+            const formData = new FormData(form);
+            formData.append('page', page);
+            
+            // Añadir token CSRF
+            formData.append('_token', '{{ csrf_token() }}');
+
+            // Realizar petición fetch
+            fetch('{{ route("songs.index") }}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Error en la respuesta del servidor');
+                }
+                return response.json();
+            })
+            .then(data => {
+                songsContainer.innerHTML = data.html;
+                
+                // Actualizar URL con parámetros sin recargar la página
+                const params = new URLSearchParams();
+                if (searchInput.value) params.append('search', searchInput.value);
+                if (artistSelect.value) params.append('artist', artistSelect.value);
+                
+                genreCheckboxes.forEach(checkbox => {
+                    if (checkbox.checked) {
+                        params.append('genres[]', checkbox.value);
+                    }
+                });
+                
+                if (page > 1) params.append('page', page);
+                
+                const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+                window.history.pushState({ path: newUrl }, '', newUrl);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                songsContainer.innerHTML = `
+                    <div class="bg-white p-6 rounded-lg shadow text-center">
+                        <p class="text-red-600">Ocurrió un error al cargar las canciones. Por favor, inténtalo de nuevo.</p>
+                    </div>
+                `;
+            })
+            .finally(() => {
+                // Ocultar indicador de carga
+                loadingIndicator.classList.add('hidden');
+            });
+        }
+    });
+</script>
 @endsection

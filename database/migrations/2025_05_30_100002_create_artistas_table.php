@@ -6,25 +6,20 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
+    public function up()
     {
-        Schema::create('artistas', function (Blueprint $table) {
-            $table->id();
-            $table->string('nombre', 100)->unique();
-            $table->text('biografia')->nullable();
-            $table->string('imagen')->nullable();
-            $table->string('pais', 100)->nullable();
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('artistas')) {
+            Schema::create('artistas', function (Blueprint $table) {
+                $table->id();
+                $table->string('nombre');  // Cambiado de 'name' a 'nombre' para coincidir con el seeder
+                $table->text('biografia')->nullable();
+                $table->string('pais')->nullable();  // Añadido campo 'pais' que usa el seeder
+                $table->timestamps();
+            });
+        }
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
+    public function down()
     {
         Schema::dropIfExists('artistas');
     }

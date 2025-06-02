@@ -6,26 +6,26 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
+    public function up()
     {
         Schema::create('canciones', function (Blueprint $table) {
             $table->id();
-            $table->string('title', 100);
-            $table->foreignId('artist_id')->constrained('artistas')->onDelete('cascade');
-            $table->foreignId('album_id')->constrained()->onDelete('cascade');
-            $table->time('duration');
-            $table->foreignId('genre_id')->constrained('generos')->onDelete('cascade');
+            $table->string('title');
+            $table->string('duration');
+            $table->unsignedBigInteger('album_id');
+            $table->unsignedBigInteger('artist_id');
+            $table->unsignedBigInteger('genre_id');
+            $table->integer('play_count')->default(0);
+            $table->string('cover_image')->nullable();
             $table->timestamps();
+
+            $table->foreign('album_id')->references('id')->on('albums');
+            $table->foreign('artist_id')->references('id')->on('artistas');
+            $table->foreign('genre_id')->references('id')->on('generos');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
+    public function down()
     {
         Schema::dropIfExists('canciones');
     }

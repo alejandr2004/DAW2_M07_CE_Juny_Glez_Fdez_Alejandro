@@ -7,6 +7,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\PlaylistController;
 use App\Http\Controllers\SongController;
 use App\Http\Controllers\AlbumController;
+use App\Http\Controllers\ArtistController;
 
 /*
 |--------------------------------------------------------------------------
@@ -38,12 +39,17 @@ Route::middleware('auth')->group(function () {
     
     // Rutas de exploración de catálogo (protegidas)
     Route::get('/songs', [SongController::class, 'index'])->name('songs.index');
+    Route::post('/songs', [SongController::class, 'index']); // Ruta POST para filtros AJAX
     Route::get('/songs/{song}', [SongController::class, 'show'])->name('songs.show');
     Route::get('/albums', [AlbumController::class, 'index'])->name('albums.index');
     Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');
     
-    // Ruta para reproducir canciones
-    Route::post('/songs/{song}/play', [SongController::class, 'play'])->name('songs.play');
+    // No hay ruta para reproducir canciones (solo simulación)
+    
+    // Rutas AJAX para canciones
+    Route::get('/songs/data', [SongController::class, 'getSongs'])->name('songs.data');
+    Route::post('/songs/{song}/update-ajax', [SongController::class, 'updateAjax'])->name('songs.update.ajax');
+    Route::delete('/songs/{song}/delete-ajax', [SongController::class, 'destroyAjax'])->name('songs.delete.ajax');
 
     // Rutas para el panel de administración
     Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
@@ -51,23 +57,20 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [AdminController::class, 'dashboard'])->name('dashboard');
         
         // Gestión de usuarios
-        Route::get('/users', [AdminController::class, 'users'])->name('users');
+        Route::match(['get', 'post'], '/users', [AdminController::class, 'users'])->name('users');
         Route::patch('/users/{user}/role', [AdminController::class, 'updateUserRole'])->name('users.updateRole');
+        Route::patch('/users/{user}/toggle-disabled', [AdminController::class, 'toggleDisabled'])->name('users.toggleDisabled');
         Route::delete('/users/{user}', [AdminController::class, 'destroyUser'])->name('users.destroy');
         
         // Gestión de canciones
-        Route::get('/songs', [AdminController::class, 'songs'])->name('songs');
+        Route::match(['get', 'post'], '/songs', [AdminController::class, 'songs'])->name('songs');
         
-        // Ya no hay gestión de artistas
+        // No hay gestión de artistas
         
-        // Gestión de géneros
-        Route::get('/genres', [AdminController::class, 'genres'])->name('genres');
-        Route::post('/genres', [AdminController::class, 'storeGenre'])->name('genres.store');
-        Route::put('/genres/{genre}', [AdminController::class, 'updateGenre'])->name('genres.update');
-        Route::delete('/genres/{genre}', [AdminController::class, 'destroyGenre'])->name('genres.destroy');
+        // No hay gestión de géneros
         
         // Gestión de álbumes
-        Route::get('/albums', [AdminController::class, 'albums'])->name('albums');
+        Route::match(['get', 'post'], '/albums', [AdminController::class, 'albums'])->name('albums');
     });
     
     // Rutas admin de gestión de canciones
@@ -77,7 +80,16 @@ Route::middleware('auth')->group(function () {
     Route::put('/admin/songs/{song}', [SongController::class, 'update'])->name('songs.update');
     Route::delete('/admin/songs/{song}', [SongController::class, 'destroy'])->name('songs.destroy');
     
-    // Ya no hay rutas de gestión de artistas
+    // No hay gestión de artistas
+    
+    // Fallback para cualquier ruta de artistas (las redirige al inicio)
+    Route::get('/artists', function() { return redirect()->route('home'); })->name('artists.index');
+    Route::get('/artists/{any}', function() { return redirect()->route('home'); })->name('artists.show');
+    Route::get('/admin/artists/create', function() { return redirect()->route('admin.dashboard'); })->name('artists.create');
+    Route::post('/admin/artists', function() { return redirect()->route('admin.dashboard'); })->name('artists.store');
+    Route::get('/admin/artists/{any}/edit', function() { return redirect()->route('admin.dashboard'); })->name('artists.edit');
+    Route::put('/admin/artists/{any}', function() { return redirect()->route('admin.dashboard'); })->name('artists.update');
+    Route::delete('/admin/artists/{any}', function() { return redirect()->route('admin.dashboard'); })->name('artists.destroy');
     
     // Rutas admin de gestión de álbumes
     Route::get('/admin/albums/create', [AlbumController::class, 'create'])->name('albums.create');

@@ -2,68 +2,34 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class Artist extends Model
 {
-    use HasFactory;
-    
-    /**
-     * The table associated with the model.
-     *
-     * @var string
-     */
+    protected $fillable = ['nombre', 'biografia', 'imagen', 'pais'];
+
+    // Cambiado a español para coincidir con migración
     protected $table = 'artistas';
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
-    protected $fillable = [
-        'nombre',
-        'biografia',
-        'imagen',
-        'pais'
-    ];
-
-    /**
-     * Get songs by this artist
-     */
-    public function songs(): HasMany
-    {
-        return $this->hasMany(Song::class, 'artist_id');
-    }
     
-    /**
-     * Accesor para obtener 'name' desde 'nombre'
-     * 
-     * @return string
-     */
+    // Accessor to allow using 'name' as an alias for 'nombre'
     public function getNameAttribute()
     {
         return $this->nombre;
     }
     
-    /**
-     * Mutador para establecer 'nombre' desde 'name'
-     * 
-     * @param string $value
-     * @return void
-     */
-    public function setNameAttribute($value)
+    // Accessor to allow using 'biography' as an alias for 'biografia'
+    public function getBiographyAttribute()
     {
-        $this->attributes['nombre'] = $value;
+        return $this->biografia;
     }
 
-    /**
-     * Get albums by this artist
-     */
-    public function albums(): HasMany
+    public function albums()
     {
         return $this->hasMany(Album::class);
+    }
+
+    public function songs()
+    {
+        return $this->hasMany(Song::class);
     }
 }

@@ -29,10 +29,10 @@
                     <div class="text-sm font-medium text-gray-900">{{ $album->title }}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm text-gray-900">{{ $album->artist }}</div>
+                    <div class="text-sm text-gray-900">{{ $album->artist ? $album->artist->nombre : 'Sin artista' }}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm text-gray-900">{{ $album->release_year }}</div>
+                    <div class="text-sm text-gray-900">{{ $album->release_date ? date('Y', strtotime($album->release_date)) : 'N/A' }}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm text-gray-900">{{ $album->songs_count ?? $album->songs->count() }}</div>
@@ -45,11 +45,10 @@
                             </svg>
                         </a>
                         <button
-                            class="text-red-600 hover:text-red-900 delete-btn"
-                            data-modal-target="deleteModal"
-                            data-id="{{ $album->id }}"
+                            class="text-red-600 hover:text-red-900 delete-button"
+                            data-url="{{ route('albums.destroy', $album) }}"
                             data-name="{{ $album->title }}"
-                            data-action="{{ route('albums.destroy', $album) }}"
+                            data-type="álbum"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />

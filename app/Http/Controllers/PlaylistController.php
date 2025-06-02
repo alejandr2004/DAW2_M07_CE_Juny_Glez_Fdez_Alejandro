@@ -6,6 +6,7 @@ use App\Models\Playlist;
 use App\Models\Song;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
 
 class PlaylistController extends Controller
 {
@@ -125,10 +126,29 @@ class PlaylistController extends Controller
             abort(403, 'No tienes permiso para eliminar esta playlist.');
         }
 
-        $playlist->delete();
-
-        return redirect()->route('playlists.index')
-            ->with('success', 'Playlist eliminada correctamente.');
+        try {
+            // Iniciar transacción para asegurar la eliminación completa
+            DB::beginTransaction();
+            
+            // Eliminar todas las relaciones con canciones primero
+            $playlist->songs()->detach();
+            
+            // Eliminar la playlist
+            $playlist->delete();
+            
+            // Confirmar todas las operaciones
+            DB::commit();
+            
+            return redirect()->route('playlists.index')
+                ->with('success', 'Playlist eliminada correctamente.');
+                
+        } catch (\Exception $e) {
+            // Revertir cambios en caso de error
+            DB::rollBack();
+            
+            return redirect()->route('playlists.index')
+                ->with('error', 'Error al eliminar la playlist: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -167,20 +187,35 @@ class PlaylistController extends Controller
             'songs.*' => 'exists:canciones,id',
         ]);
 
-        // Determinar el orden máximo actual
-        $maxOrder = $playlist->songs()->max('order') ?? 0;
-        
-        // Añadir nuevas canciones
-        foreach ($validated['songs'] as $songId) {
-            // Verificar si la canción ya está en la playlist
-            if (!$playlist->songs->contains($songId)) {
-                $maxOrder++;
-                $playlist->songs()->attach($songId, ['order' => $maxOrder]);
-            }
-        }
+        try {
+            // Iniciar transacción para asegurar operaciones atómicas
+            DB::beginTransaction();
 
-        return redirect()->route('playlists.show', $playlist)
-            ->with('success', 'Canciones añadidas correctamente a la playlist.');
+            // Determinar el orden máximo actual
+            $maxOrder = $playlist->songs()->max('order') ?? 0;
+            
+            // Añadir nuevas canciones
+            foreach ($validated['songs'] as $songId) {
+                // Verificar si la canción ya está en la playlist
+                if (!$playlist->songs->contains($songId)) {
+                    $maxOrder++;
+                    $playlist->songs()->attach($songId, ['order' => $maxOrder]);
+                }
+            }
+            
+            // Confirmar todas las operaciones
+            DB::commit();
+            
+            return redirect()->route('playlists.show', $playlist)
+                ->with('success', 'Canciones añadidas correctamente a la playlist.');
+                
+        } catch (\Exception $e) {
+            // Revertir cambios en caso de error
+            DB::rollBack();
+            
+            return redirect()->route('playlists.show', $playlist)
+                ->with('error', 'Error al añadir canciones a la playlist: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -193,15 +228,29 @@ class PlaylistController extends Controller
             abort(403, 'No tienes permiso para modificar esta playlist. Solo el propietario puede eliminar canciones.');
         }
 
-        // Eliminar la canción de la playlist
-        $playlist->songs()->detach($song->id);
-        
-        // Reordenar las canciones restantes
-        $songs = $playlist->songs()->orderBy('order')->get();
-        foreach ($songs as $index => $song) {
-            $playlist->songs()->updateExistingPivot($song->id, ['order' => $index + 1]);
+        try {
+            // Iniciar transacción para asegurar operaciones atómicas
+            DB::beginTransaction();
+            
+            // Eliminar la canción de la playlist
+            $playlist->songs()->detach($song->id);
+            
+            // Reordenar las canciones restantes
+            $songs = $playlist->songs()->orderBy('order')->get();
+            foreach ($songs as $index => $song) {
+                $playlist->songs()->updateExistingPivot($song->id, ['order' => $index + 1]);
+            }
+            
+            // Confirmar todas las operaciones
+            DB::commit();
+            
+            return back()->with('success', 'Canción eliminada de la playlist.');
+            
+        } catch (\Exception $e) {
+            // Revertir cambios en caso de error
+            DB::rollBack();
+            
+            return back()->with('error', 'Error al eliminar la canción de la playlist: ' . $e->getMessage());
         }
-
-        return back()->with('success', 'Canción eliminada de la playlist.');
     }
 }

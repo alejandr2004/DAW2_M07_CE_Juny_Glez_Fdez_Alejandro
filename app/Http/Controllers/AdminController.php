@@ -7,6 +7,7 @@ use App\Models\Song;
 use App\Models\Album;
 use App\Models\Genre;
 use App\Models\Playlist;
+use App\Models\Artist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -36,7 +37,6 @@ class AdminController extends Controller
         // Estadísticas para el dashboard
         $stats = [
             'songs' => Song::count(),
-            'artists' => Artist::count(),
             'albums' => Album::count(),
             'genres' => Genre::count(),
             'users' => User::count(),
@@ -48,6 +48,7 @@ class AdminController extends Controller
     
     /**
      * Gestión de usuarios
+     * @method GET|POST
      */
     public function users(Request $request)
     {
@@ -75,17 +76,36 @@ class AdminController extends Controller
             });
         }
         
-        // Ordenar
-        $query->orderBy('name');
+        // Ordenar resultados
+        $sortField = 'name'; // Ordenación por defecto
+        $sortDirection = 'asc';
+        
+        if ($request->has('sort') && !empty($request->sort)) {
+            switch ($request->sort) {
+                case 'name':
+                    $sortField = 'name';
+                    break;
+                case 'email':
+                    $sortField = 'email';
+                    break;
+                case 'created_at':
+                    $sortField = 'created_at';
+                    $sortDirection = 'desc'; // Más recientes primero
+                    break;
+            }
+        }
+        
+        $query->orderBy($sortField, $sortDirection);
         
         // Paginar resultados
-        $users = $query->paginate(15)->withQueryString();
+        $perPage = $request->per_page ?? 15;
+        $users = $query->paginate($perPage)->withQueryString();
         
         // Si es petición AJAX, devolver vista parcial
         if ($request->ajax()) {
             return response()->json([
                 'html' => view('admin.partials.user-list', compact('users'))->render(),
-                'pagination' => view('partials.pagination', ['paginator' => $users])->render(),
+                'pagination' => view('admin.partials.ajax-pagination', ['paginator' => $users])->render(),
             ]);
         }
         
@@ -134,6 +154,47 @@ class AdminController extends Controller
         }
         
         return back()->with('success', 'Rol de usuario actualizado correctamente');
+    }
+    
+    /**
+     * Deshabilitar o habilitar un usuario
+     */
+    public function toggleDisabled(Request $request, User $user)
+    {
+        // Verificar si el usuario es admin
+        if ($request->user()->role !== 'admin') {
+            if ($request->ajax()) {
+                return response()->json(['error' => 'No autorizado'], 403);
+            }
+            return redirect()->route('home')->with('error', 'No tienes permisos para esta acción.');
+        }
+        
+        // No permitir deshabilitar la propia cuenta
+        if ($user->id === $request->user()->id) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'No puedes deshabilitar tu propia cuenta'
+                ]);
+            }
+            return back()->with('error', 'No puedes deshabilitar tu propia cuenta');
+        }
+        
+        // Cambiar estado de deshabilitado
+        $user->is_disabled = !$user->is_disabled;
+        $user->save();
+        
+        $message = $user->is_disabled ? 'Usuario deshabilitado correctamente' : 'Usuario habilitado correctamente';
+        
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'user' => $user
+            ]);
+        }
+        
+        return back()->with('success', $message);
     }
     
     /**
@@ -191,8 +252,9 @@ class AdminController extends Controller
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Error al eliminar el usuario: ' . $e->getMessage()
-                ]);
+                    'message' => 'Error al eliminar el usuario: ' . $e->getMessage(),
+                    'error' => $e->getMessage()
+                ], 500);
             }
             
             return back()->with('error', 'Error al eliminar el usuario: ' . $e->getMessage());
@@ -212,33 +274,48 @@ class AdminController extends Controller
             return redirect()->route('home')->with('error', 'No tienes permisos para acceder al panel de administración.');
         }
         
-        $query = Song::with(['album', 'genre']);
+        // Log para depurar la petición
+        \Log::info('AdminController@songs - Petición recibida', [
+            'esAjax' => $request->ajax(),
+            'method' => $request->method(),
+            'parametros' => $request->all()
+        ]);
         
-        // Filtrar por artista
+        $query = Song::with(['album', 'genre', 'artist']);
+        
+        // Filtrar por artista (usando el campo 'nombre' en español)
         if ($request->has('artist') && !empty($request->artist)) {
-            $query->where('artist', 'like', "%{$request->artist}%");
+            $artistName = $request->artist;
+            \Log::info('Filtrando por artista', ['nombre' => $artistName]);
+            
+            $query->whereHas('artist', function($q) use ($artistName) {
+                $q->where('nombre', 'like', "%{$artistName}%");
+            });
         }
         
         // Filtrar por género
         if ($request->has('genre_id') && !empty($request->genre_id)) {
+            \Log::info('Filtrando por género', ['id' => $request->genre_id]);
             $query->where('genre_id', $request->genre_id);
         }
         
         // Filtrar por álbum
         if ($request->has('album_id') && !empty($request->album_id)) {
+            \Log::info('Filtrando por álbum', ['id' => $request->album_id]);
             $query->where('album_id', $request->album_id);
         }
         
         // Búsqueda por título
         if ($request->has('search') && !empty($request->search)) {
             $search = $request->search;
+            \Log::info('Buscando por título', ['search' => $search]);
+            
             $query->where(function($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('artist', 'like', "%{$search}%");
+                $q->where('title', 'like', "%{$search}%");
             });
         }
         
-        // Ordenar
+        // Ordenar resultados
         $query->orderBy('title');
         
         // Paginar resultados
@@ -246,20 +323,28 @@ class AdminController extends Controller
         
         // Obtener listas para filtros
         $genres = Genre::orderBy('name')->get();
+        $artists = Artist::orderBy('nombre')->get(); // Usar 'nombre' en español, no 'name'
+        $albums = Album::orderBy('title')->get();
         
         // Si es petición AJAX, devolver vista parcial
         if ($request->ajax()) {
+            \Log::info('Devolviendo respuesta AJAX', [
+                'canciones' => $songs->count(),
+                'paginación' => $songs->lastPage() > 1 ? 'Sí' : 'No'
+            ]);
+            
             return response()->json([
-                'html' => view('admin.partials.song-list', compact('songs'))->render(),
+                'html' => view('admin.partials.song-list', compact('songs', 'genres', 'artists', 'albums'))->render(),
                 'pagination' => view('admin.partials.ajax-pagination', ['paginator' => $songs])->render(),
             ]);
         }
         
-        return view('admin.songs.index', compact('songs', 'genres'));
+        return view('admin.songs.index', compact('songs', 'genres', 'artists', 'albums'));
     }
     
     /**
      * Gestión de álbumes
+     * @method GET|POST
      */
     public function albums(Request $request)
     {
@@ -270,31 +355,70 @@ class AdminController extends Controller
             }
             return redirect()->route('home')->with('error', 'No tienes permisos para acceder al panel de administración.');
         }
+
+        // Registrar lo que estamos recibiendo en el formulario
+        \Log::info('Request datos para filtrado de albums:', $request->all());
         
-        $query = Album::withCount('songs');
+        $query = Album::with('artist')->withCount('songs');
         
         // Filtrar por artista
         if ($request->has('artist') && !empty($request->artist)) {
-            $query->where('artist', 'like', "%{$request->artist}%");
+            $query->whereHas('artist', function($q) use ($request) {
+                // Usando el campo en español 'nombre' para la búsqueda
+                $q->where('nombre', 'like', "%{$request->artist}%");
+            });
         }
         
-        // Búsqueda por título
+        // Búsqueda por título o artista
         if ($request->has('search') && !empty($request->search)) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('artist', 'like', "%{$search}%");
+                  ->orWhereHas('artist', function($q) use ($search) {
+                      // Usando el campo en español 'nombre' para la búsqueda
+                      $q->where('nombre', 'like', "%{$search}%");
+                  });
             });
         }
         
-        // Ordenar
-        $query->orderBy('title');
+        // Ordenar resultados
+        $sortField = 'title'; // Ordenación por defecto
+        $sortDirection = 'asc';
+        
+        if ($request->has('sort') && !empty($request->sort)) {
+            switch ($request->sort) {
+                case 'title':
+                    $sortField = 'title';
+                    break;
+                case 'artist':
+                    // No podemos ordenar directamente por el nombre del artista aquí,
+                    // lo manejaremos usando orderBy en raw SQL
+                    $query->select('albums.*')
+                        ->leftJoin('artists', 'albums.artist_id', '=', 'artists.id')
+                        ->orderBy('artists.nombre', 'asc');
+                    $sortField = null; // Ya hemos aplicado la ordenación
+                    break;
+                case 'release_date':
+                    $sortField = 'release_date';
+                    $sortDirection = 'desc'; // Más recientes primero
+                    break;
+                case 'songs_count':
+                    $query->orderBy('songs_count', 'desc');
+                    $sortField = null; // Ya hemos aplicado la ordenación
+                    break;
+            }
+        }
+        
+        // Aplicar ordenación si no se ha aplicado ya
+        if ($sortField) {
+            $query->orderBy($sortField, $sortDirection);
+        }
         
         // Paginar resultados
         $albums = $query->paginate(12)->withQueryString();
         
         // Si es petición AJAX, devolver vista parcial
-        if ($request->ajax()) {
+        if ($request->ajax() || $request->isMethod('post')) {
             return response()->json([
                 'html' => view('admin.partials.album-list', compact('albums'))->render(),
                 'pagination' => view('admin.partials.ajax-pagination', ['paginator' => $albums])->render(),
@@ -409,6 +533,7 @@ class AdminController extends Controller
                 'success' => true,
                 'message' => 'Género actualizado correctamente',
                 'genre' => $genre,
+                'redirect' => route('admin.genres'),
                 'html' => view('admin.partials.genre-item', compact('genre'))->render(),
             ]);
         }
@@ -429,28 +554,43 @@ class AdminController extends Controller
             return redirect()->route('home')->with('error', 'No tienes permisos para esta acción.');
         }
         
-        // Comprobar si hay canciones asociadas
-        if ($genre->songs()->count() > 0) {
+        // Usar transacción para eliminar el género
+        try {
+            DB::beginTransaction();
+            
+            // Si el género tiene canciones, asignarlas a un género por defecto o eliminarlas
+            if ($genre->songs()->count() > 0) {
+                // Aquí podrías crear una lógica para reasignar canciones a otro género
+                // o eliminarlas si así lo prefieres. En este caso las eliminaremos.
+                $genre->songs()->delete();
+            }
+            
+            // Eliminar género
+            $genre->delete();
+            
+            DB::commit();
+            
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Género y sus canciones asociadas eliminados correctamente',
+                    'id' => $genre->id,
+                    'redirect' => route('admin.genres')
+                ]);
+            }
+            
+            return redirect()->route('admin.genres')->with('success', 'Género y sus canciones asociadas eliminados correctamente');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
             if ($request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'No se puede eliminar este género porque tiene canciones asociadas'
+                    'error' => 'Ha ocurrido un error al eliminar el género: ' . $e->getMessage()
                 ]);
             }
-            return back()->with('error', 'No se puede eliminar este género porque tiene canciones asociadas');
+            
+            return back()->with('error', 'Ha ocurrido un error al eliminar el género: ' . $e->getMessage());
         }
-        
-        // Eliminar género
-        $genre->delete();
-        
-        if ($request->ajax()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Género eliminado correctamente',
-                'id' => $genre->id
-            ]);
-        }
-        
-        return redirect()->route('admin.genres')->with('success', 'Género eliminado correctamente');
     }
 }

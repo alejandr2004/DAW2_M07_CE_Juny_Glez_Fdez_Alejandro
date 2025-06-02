@@ -5,7 +5,7 @@
     <h1 class="text-2xl font-bold mb-6">Editar Canción: {{ $song->title }}</h1>
 
     <div class="bg-white p-6 rounded-lg shadow">
-        <form action="{{ route('songs.update', $song) }}" method="POST" enctype="multipart/form-data">
+        <form id="songEditForm" action="{{ route('songs.update', $song) }}" method="POST" enctype="multipart/form-data" data-song-id="{{ $song->id }}">
             @csrf
             @method('PUT')
             
@@ -82,10 +82,27 @@
             </div>
             
             <div class="flex justify-between">
-                <a href="{{ route('songs.show', $song) }}" class="btn-secondary py-2 px-4">Cancelar</a>
-                <button type="submit" class="btn-spotify py-2 px-6">Actualizar Canción</button>
+                <a href="{{ route('songs.show', $song) }}" class="btn-secondary py-2 px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded">Cancelar</a>
+                <button type="submit" id="saveButton" class="btn-spotify py-2 px-6 bg-green-500 hover:bg-green-600 text-white rounded"><span>Actualizar Canción</span></button>
             </div>
         </form>
+        
+        <!-- Información adicional -->
+        <div class="mt-4 pt-4 border-t border-gray-200">
+            <div class="flex flex-col md:flex-row md:items-center text-sm text-gray-600">
+                <span class="font-medium">Artista:</span>
+                <span class="song-artist ml-2">{{ $song->artist->nombre }}</span>
+            </div>
+            <div class="flex flex-col md:flex-row md:items-center text-sm text-gray-600 mt-1">
+                <span class="font-medium">Género:</span>
+                <span class="song-genre ml-2">{{ $song->genre->name }}</span>
+            </div>
+        </div>
     </div>
 </div>
+
+@push('scripts')
+<script src="{{ asset('js/song-edit-ajax.js') }}"></script>
+@endpush
+
 @endsection

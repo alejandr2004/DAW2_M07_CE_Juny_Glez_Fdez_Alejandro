@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('canciones', function (Blueprint $table) {
-            $table->string('cover_image')->nullable()->after('genre_id');
+        Schema::table('users', function (Blueprint $table) {
+            $table->boolean('is_disabled')->default(false);
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('canciones', function (Blueprint $table) {
-            $table->dropColumn('cover_image');
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn('is_disabled');
         });
     }
 };
